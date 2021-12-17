@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <link href="main.css" rel="stylesheet">
+        <meta charset=utf-8" />
+        <title>Compass Guide</title>
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+
+    </head>
+
+    <body onload="startUpdate();">
+        <div class="main-container">
+            <div class="title-menu">
+                <div class="title-item">
+                    Compass Guide.
+                </div>
+
+                <div class="title-mini-item">
+                    App state: <span id="actual_app_state"></span>
+                </div>
+
+                <div class="title-mini-item">
+                    <span id="timer_value"></span>
+                </div>
+            </div>
+
+            <div class="data_container">
+                <div class="data-picture">
+                    <img class="figure" src="{{ url_for('video_feed') }}">
+                </div>
+
+                <div class="data_right-item">
+                    Angles:<br>
+                    <table>
+                        <tr>
+                            <td>Yaw</td>
+                            <td><span id="yaw_value"></span></td>
+                        </tr>
+                        <tr>
+                            <td>Pitch</td>
+                            <td><span id="pitch_value"></span></td>
+                        </tr>
+                        <tr>
+                            <td>Roll</td>
+                            <td><span id="roll_value"></span></td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+
+            <form method="post" action="/">
+                <input type="submit" value="Start Logging" name="Start Logging"/>
+                <input type="submit" value="Stop Logging" name="Stop Logging" />
+            </form>
+        </div>
+
+        <script>
+            let intervalID;
+
+            function startUpdate() {
+                intervalID = setInterval(update_values, 100);
+            }
+
+            function update_values() {
+                $SCRIPT_ROOT = {{ request.script_root|tojson|safe }};
+                $.getJSON($SCRIPT_ROOT+"/stuff",
+                    function(data) {
+                        $("#timer_value").text(data.timer_value)
+                        $("#actual_app_state").text(data.actual_app_state)
+                  });
+                $.getJSON($SCRIPT_ROOT+"/stream_data",
+                    function(data) {
+                        $("#yaw_value").text(data.yaw_value)
+                        $("#pitch_value").text(data.pitch_value)
+                        $("#roll_value").text(data.roll_value)
+                  });
+            }
+        </script>
+    </body>
+</html>

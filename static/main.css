@@ -1,0 +1,157 @@
+.main-container{
+    display: flex;
+    flex-flow: column nowrap;
+    height: 95vh;
+    width: auto;
+    position: center;
+    margin: 1vh 1vw 1vh 1vw;
+    background-color: coral;
+    border-color: blue;
+    border-width: 2px;
+    border-style: double;
+}
+
+.title-menu{
+    max-height: 6%;
+    align-items: center;
+    vertical-align: center;
+    height: 6%;
+    width: auto;
+    display: flex;
+    gap: 0.5%;
+    flex-flow: row nowrap;
+}
+
+.title-item{
+    max-height: 100%;
+    vertical-align: middle;
+    width: 70%;
+    text-align: center;
+    font-weight: bold;
+    font-size: xx-large;
+    min-width: fit-content;
+    min-height: content-box;
+    border-color: blue;
+    border-width: 2px;
+    border-style: double;
+}
+
+.title-mini-item{
+    max-height: 100%;
+    vertical-align: middle;
+    width: 13%;
+    margin-left: auto;
+    text-align: center;
+    font-weight: bold;
+    font-size: large;
+    min-width: fit-content;
+    min-height: content-box;
+    border-color: blue;
+    border-width: 2px;
+    border-style: double;
+}
+
+.data_container{
+    height: 90%;
+    width: auto;
+    display: flex;
+    align-items: center;
+    gap: 0.5%;
+    flex-flow: row nowrap;
+}
+
+.data-picture{
+    width: 70%;
+    height: 90%;
+    text-align: center;
+    font-weight: bold;
+    vertical-align: center;
+    font-size: x-large;
+    min-width: fit-content;
+    min-height: content-box;
+    border-width: 2px;
+    border-style: groove;
+    border-color: blue;
+}
+
+.data_right-item{
+    margin-left: auto;
+    width: 28%;
+    text-align: left;
+    font-weight: bold;
+    vertical-align: center;
+    font-size: large;
+    min-width: fit-content;
+    min-height: content-box;
+    border-color: blue;
+    border-width: 2px;
+    border-style: double;
+}
+
+.figure {
+    height: 95%;
+    max-width: 100%;
+    text-align: center;
+}
+
+.figure_title {
+    height: 5%;
+    text-align: center;
+    font-family:Arial, Helvetica, sans-serif;
+    font-weight: bold;
+    font-size: large;
+}
+
+img {
+    border-width: 10px;
+    border-style: outset;
+    transform: rotateX(180deg);
+}
+
+table {
+    width: 95%;
+    border-collapse: collapse;
+    border: 2px solid rgb(200,200,200);
+    letter-spacing: 1px;
+    font-size: 0.8rem;
+}
+
+td, th {
+    border: 2px solid rgb(190,190,190);
+    padding: 10px 20px;
+}
+
+th {
+    background-color: rgb(235,235,235);
+}
+
+td {
+    width: 40%;
+    text-align: center;
+    font-size: medium;
+}
+
+caption {
+    padding: 10px;
+}
+
+input[type=text] {
+    padding:5px;
+    border:2px solid #ccc;
+    -webkit-border-radius: 5px;
+    border-radius: 5px;
+}
+
+input[type=text]:focus {
+    border-color:#333;
+}
+
+input[type=submit] {
+    padding:5px 15px;
+    background: chocolate;
+    border-width: 5px;
+    border-style: groove;
+    cursor:pointer;
+    -webkit-border-radius: 5px;
+    border-radius: 5px;
+}
