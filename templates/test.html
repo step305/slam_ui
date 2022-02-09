@@ -1,0 +1,62 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<script>
+window.onload = function () {
+
+var dps = []; // dataPoints
+var chart = new CanvasJS.Chart("chartContainer", {
+    title :{
+        text: "Dynamic Data"
+	},
+    data: [{
+        type: "line",
+        dataPoints: dps
+	}]
+});
+
+var xVal = 0;
+var yVal = 100;
+var updateInterval = 1;
+var dataLength = 200; // number of dataPoints visible at any point
+
+
+var updateChar = function(count) {
+    $SCRIPT_ROOT = {{ request.script_root|tojson|safe }};
+    $.getJSON($SCRIPT_ROOT+"/timer",
+        function(data) {
+            $("#timer_value").text(data.timer_value)
+            $("#actual_app_state").text(data.actual_app_state)
+      });
+    $.getJSON($SCRIPT_ROOT+"/stream_data",
+        function(data) {
+            $("#yaw_value").text(data.yaw_value)
+            $("#pitch_value").text(data.pitch_value)
+            $("#roll_value").text(data.roll_value)
+
+            var num = Number(data.yaw_value.replace( /[^\d\.]*/g, ''));
+            console.log(num)
+            dps.push({
+                x: xVal,
+                y: num
+            });
+            xVal++;
+            if (dps.length > dataLength) {
+		        dps.shift();
+	        }
+            chart.render();
+      });
+}
+updateChar(dataLength);
+setInterval(function (){updateChar()}, 10);
+
+}
+</script>
+</head>
+<body>
+<div id="chartContainer" style="height: 370px; width:100%;"></div>
+<span id="pitch_value"></span>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+<script src="https://canvasjs.com/assets/script/canvasjs.min.js"></script>
+</body>
+</html>

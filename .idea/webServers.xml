@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="WebServers">
+    <option name="servers">
+      <webServer id="f57d9143-b51d-48f0-bdb0-dc21ac685b94" name="yandex_facerec">
+        <fileTransfer rootFolder="/home/step305" accessType="SFTP" host="51.250.21.253" port="22" sshConfigId="46d69854-d989-427f-81d3-898a1a9f1db2" sshConfig="step305@51.250.21.253:22 password">
+          <advancedOptions>
+            <advancedOptions dataProtectionLevel="Private" keepAliveTimeout="0" passiveMode="true" shareSSLContext="true" />
+          </advancedOptions>
+        </fileTransfer>
+      </webServer>
+    </option>
+  </component>
+</project>

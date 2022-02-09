@@ -155,3 +155,74 @@ input[type=submit] {
     -webkit-border-radius: 5px;
     border-radius: 5px;
 }
+
+.menu-main {
+    list-style: none;
+    text-align: right;
+    width: 100%;
+    height: 40px;
+    margin: 0;
+    display: flex;
+    vertical-align: middle;
+    padding: 0;
+    background-color: inherit;
+    border-width: 2px;
+    border-color: violet;
+    border-style: solid;
+    justify-content: flex-end;
+}
+
+.menu-main-item {
+    padding: 0;
+    margin: 0;
+    height: 90%;
+    min-width: fit-content;
+    align-items: center;
+    justify-content: center;
+    vertical-align: middle;
+    width: 10%;
+    background-color: inherit;
+    display: flex;
+    border-width: 2px;
+    border-color: violet;
+    border-style: solid;
+}
+
+.menu-main-href {
+    width: 100%;
+    min-width: fit-content;
+    height: 100%;
+    line-height: 100%;
+    margin: auto;
+    display: block;
+    font: bold 11px Arial;
+    text-align: center;
+    vertical-align: middle;
+    text-decoration: none;
+    text-transform: uppercase;
+    background-color: inherit;
+    color: black;
+    border-width: 1px;
+    border-style: solid;
+    border-color: blue;
+}
+
+.menu-main-href:focus,
+.menu-main-href:hover{
+    width: 100%;
+    min-width: fit-content;
+    height: 100%;
+    line-height: 100%;
+    margin: auto;
+    display: block;
+    font: bold 14px Arial;
+    text-align: center;
+    vertical-align: middle;
+    text-decoration: none;
+    text-transform: uppercase;
+    background-color: darkkhaki;
+    color: white;
+    border-width: 1px;
+    border-style: solid;
+    border-color: blue;
+}

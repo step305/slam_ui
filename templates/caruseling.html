@@ -1,0 +1,33 @@
+<div class="data_container">
+    <div class="data-picture">
+        <img class="figure" src="{{ url_for('video_feed') }}">
+    </div>
+
+    <div class="data_right-item">
+        Angles:<br>
+        <table>
+            <tr>
+                <td>Yaw</td>
+                <td><span id="yaw_value"></span></td>
+            </tr>
+            <tr>
+                <td>Pitch</td>
+                <td><span id="pitch_value"></span></td>
+            </tr>
+            <tr>
+                <td>Roll</td>
+                <td><span id="roll_value"></span></td>
+            </tr>
+            <tr></tr>
+            <tr>
+                <td>ADC value</td>
+                <td><span id="adc_value"></span></td>
+            </tr>
+        </table>
+    </div>
+</div>
+
+<form method="post" action="/command">
+    <input type="submit" value="start" name="action"/>
+    <input type="submit" value="stop" name="action"/>
+</form>
