@@ -9,6 +9,13 @@
           </advancedOptions>
         </fileTransfer>
       </webServer>
+      <webServer id="2edce61c-66b1-4743-b80d-076daa342b0e" name="JetsonNano B01">
+        <fileTransfer rootFolder="/home/step305" accessType="SFTP" host="192.168.0.17" port="22" sshConfigId="d37d89ef-21fc-4d1a-b1f4-89d3cf8bd9dc" sshConfig="JetsonNano B01">
+          <advancedOptions>
+            <advancedOptions dataProtectionLevel="Private" keepAliveTimeout="0" passiveMode="true" shareSSLContext="true" />
+          </advancedOptions>
+        </fileTransfer>
+      </webServer>
     </option>
   </component>
 </project>

@@ -3,6 +3,9 @@
   <component name="SshConfigs">
     <configs>
       <sshConfig authType="PASSWORD" host="51.250.21.253" id="46d69854-d989-427f-81d3-898a1a9f1db2" port="22" nameFormat="DESCRIPTIVE" username="step305" useOpenSSHConfig="true" />
+      <sshConfig authType="PASSWORD" host="192.168.0.17" id="d37d89ef-21fc-4d1a-b1f4-89d3cf8bd9dc" port="22" customName="JetsonNano B01" nameFormat="CUSTOM" username="step305" useOpenSSHConfig="true">
+        <option name="customName" value="JetsonNano B01" />
+      </sshConfig>
     </configs>
   </component>
 </project>

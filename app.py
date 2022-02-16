@@ -10,6 +10,7 @@ import logging
 import socket
 import base64
 import numpy as np
+import threading
 
 # from OpenSSL import SSL
 
@@ -37,28 +38,40 @@ RCV_BUFFER_LEN = 10000000
 
 
 def get_pid(name):
-    return int(check_output(["pidof", name]))
+    try:
+        ret = int(check_output(["pidof", name]))
+    except Exception as e:
+        ret = -100
+    return ret
 
 
 class SLAMReader(object):
     def __init__(self):
-        self.stop_now = False
+        self.stop_now = True
+        self.running = False
+        self.stop_update = threading.Event()
         if DEBUG:
             self.fifo = None
             self.vid = None
         else:
             self.slam_socket = None
         self.package = None
-        self.grabbed = False
-        self.proc = threading.Thread(target=self.update, args=())
-        self.proc.start()
-        self.frame = stop_image
+        self.grabbed = True
+        self.frame = stop_image.tobytes()
         self.stop_image = stop_image.tobytes()
         self.wait_image = jpg_wait_frame.tobytes()
+        self.data_ready = threading.Event()
+
+    def run(self):
+        self.stop_now = False
+        self.proc = threading.Thread(target=self.update, args=())
+        self.proc.start()
+        self.running = True
 
     def __del__(self):
         if not DEBUG:
-            self.slam_socket.close()
+            # self.slam_socket.close()
+            self.stop_update.set()
 
     def get_frame(self):
         if self.stop_now:
@@ -67,6 +80,7 @@ class SLAMReader(object):
             image = self.frame
         self.grabbed = False
         if self.stop_now:
+            time.sleep(0.1)
             self.grabbed = True
         return image  # .tobytes()
 
@@ -74,42 +88,97 @@ class SLAMReader(object):
         if self.stop_now:
             data = None
         else:
-            data = {i: self.package[i] for i in self.package if i != 'frame'}
+            data = None
+            if self.package:
+                data = {i: self.package[i] for i in self.package if i != 'frame'}
         return data
 
     def stop(self):
-        if not DEBUG:
-            self.slam_socket.close()
-        else:
-            self.vid.release()
-        self.stop_now = True
-        self.grabbed = True
-        self.proc.join()
+        if self.running:
+            if not DEBUG:
+                self.stop_update.set()
+                #self.slam_socket.close()
+            else:
+                self.vid.release()
+            self.stop_now = True
+            self.grabbed = True
+            self.proc.join()
 
     def update(self):
+        FIFO = '/home/step305/SLAM_FIFO.tmp'
+        cnt = 0
+        max_cnt = 10
+        heading_sum = 0
+        roll_sum = 0
+        pitch_sum = 0
+        bw_sum = [0, 0, 0]
+        crh_sum = 0
+        saver_frame_counter = 0
         if DEBUG:
             self.vid = cv2.VideoCapture('video_slam.avi')
             saver_frame_counter = 0
         while True:
             if log_started.is_set():
                 if not DEBUG:
-                    self.slam_socket.send(b'next')
-                    pack = self.slam_socket.recv(24)
-                    pack_len = int(pack.decode("utf-8").lstrip().split(' ')[0])
-                    pack = []
-                    cnt = 0
-                    while cnt < pack_len:
-                        dat = self.slam_socket.recv(RCV_BUFFER_LEN)
-                        cnt = cnt + len(dat)
-                        pack.append(dat)
-                    pack = b''.join(pack)
-                    self.package = json.loads(pack)
-                    buf_decode = base64.b64decode(self.package['frame'])
-                    jpg = np.fromstring(buf_decode, np.uint8).tobytes()
+#                    self.slam_socket.send(b'next')
+#                    pack = self.slam_socket.recv(24)
+#                    pack_len = int(pack.decode("utf-8").lstrip().split(' ')[0])
+#                    pack = []
+#                    cnt = 0
+#                    while cnt < pack_len:
+#                        dat = self.slam_socket.recv(RCV_BUFFER_LEN)
+#                        cnt = cnt + len(dat)
+#                        pack.append(dat)
+#                    pack = b''.join(pack)
+#                    self.package = json.loads(pack)
+#                    buf_decode = base64.b64decode(self.package['frame'])
+                    try:
+                        with open(FIFO) as fifo:
+                            for line in fifo:
+                                if self.stop_update.is_set():
+                                    break
+#                                if quit_prog.is_set():
+#                                    pid = int(check_output(["pidof", 'SLAM_NANO']))
+#                                    os.kill(pid, signal.SIGINT)
+#                                    time.sleep(1)
+#                                    break
+                                packet = json.loads(line)
+                                if cnt == max_cnt:
+                                    earth_meas = [heading_sum / cnt, crh_sum / cnt]
+                                    self.package = {'yaw': heading_sum/cnt, 'pitch': pitch_sum/cnt, 'roll': roll_sum/cnt,
+                                                    'adc': crh_sum/cnt}
+                                    self.data_ready.set()
+                                    heading_sum = 0
+                                    roll_sum = 0
+                                    pitch_sum = 0
+                                    bw_sum = [0, 0, 0]
+                                    crh_sum = 0
+                                    cnt = 0
+                                else:
+                                    cnt = cnt + 1
+                                    heading_sum += packet['yaw']
+                                    roll_sum += packet['roll']
+                                    pitch_sum += packet['pitch']
+                                    bw_sum[0] += packet['bw'][0]
+                                    bw_sum[1] += packet['bw'][1]
+                                    bw_sum[2] += packet['bw'][2]
+                                    crh_sum += packet['adc']
+                                if packet['frame'] == "None":
+                                    pass
+                                else:
+                                    buf_decode = base64.b64decode(packet['frame'])
+                                    jpg = np.fromstring(buf_decode, np.uint8).tobytes()
+                                    self.frame = jpg
+                                    self.grabbed = True
+                    except Exception as e:
+                        print()
+                        print(e)
+                        print('Done!')
+                        break
+#                    jpg = np.fromstring(buf_decode, np.uint8).tobytes()
                     # img = cv2.imdecode(nparr, cv2.IMREAD_UNCHANGED)
                     # _, jpg = cv2.imencode('.jpg', img)
-                    self.frame = jpg
-                    self.grabbed = True
+
                 else:
                     ret, img = self.vid.read()
                     saver_frame_counter += 1
@@ -117,7 +186,7 @@ class SLAMReader(object):
                         saver_frame_counter = 0
                         self.vid.set(cv2.CAP_PROP_POS_FRAMES, 0)
                     if ret:
-                        _, jpg = cv2.imencode('.jpg', img).tobytes()
+                        jpg = cv2.imencode('.jpg', img)[1].tobytes()
                         self.package = {'yaw': 1.0, 'pitch': 2.0, 'roll': 3.0, 'adc': 100.0}
                         self.frame = jpg
                         self.grabbed = True
@@ -150,24 +219,26 @@ def start_logging():
     global slam_reader
     global actual_app_state
     global log_started
-    os.system('/home/step305/testServer/testServer &')
+    os.system('/home/step305/SLAM_NANO/slam_start.sh &')
     time.sleep(10)
     log_started.set()
-    slam_reader.slam_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    slam_reader.slam_socket.connect((HOST, PORT))
+    slam_reader.run()
+#    slam_reader.slam_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+#    slam_reader.slam_socket.connect((HOST, PORT))
     actual_app_state = 'Logger::running...'
 
 
 def stop_logging():
     global log_proc
     global log_started
+    pid = get_pid('SLAM_NANO')
+    if pid > 0:
+        os.kill(pid, signal.SIGINT)
     if log_started.is_set():
         log_started.clear()
         time.sleep(1)
         log_proc.join()
-        slam_reader.slam_socket.close()
-        pid = get_pid('testServer')
-        os.kill(pid, signal.SIGINT)
+        slam_reader.stop()
 
 
 @app.route("/utils.js")
