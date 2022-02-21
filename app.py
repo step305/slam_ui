@@ -12,6 +12,11 @@ import base64
 import numpy as np
 import threading
 
+# SLAM_COMMAND = '/home/step305/SLAM_NANO/slam_start.sh &'
+SLAM_COMMAND = '/home/sergey/SLAM_NANO/slam_start.sh &'
+# FIFO_PATH = '/home/step305/SLAM_FIFO.tmp'
+FIFO_PATH = '/home/sergey/SLAM_FIFO.tmp'
+
 # from OpenSSL import SSL
 
 DEBUG = False
@@ -105,13 +110,14 @@ class SLAMReader(object):
             self.proc.join()
 
     def update(self):
-        FIFO = '/home/step305/SLAM_FIFO.tmp'
+        FIFO = FIFO_PATH
         cnt = 0
         max_cnt = 10
         heading_sum = 0
         roll_sum = 0
         pitch_sum = 0
         bw_sum = [0, 0, 0]
+        sw_sum = [0, 0, 0]
         crh_sum = 0
         saver_frame_counter = 0
         if DEBUG:
@@ -145,8 +151,13 @@ class SLAMReader(object):
                                 packet = json.loads(line)
                                 if cnt == max_cnt:
                                     earth_meas = [heading_sum / cnt, crh_sum / cnt]
-                                    self.package = {'yaw': heading_sum/cnt, 'pitch': pitch_sum/cnt, 'roll': roll_sum/cnt,
-                                                    'adc': crh_sum/cnt}
+                                    self.package = {'yaw': heading_sum/cnt,
+                                                    'pitch': pitch_sum/cnt,
+                                                    'roll': roll_sum/cnt,
+                                                    'bw': [i/cnt for i in bw_sum],
+                                                    'sw': [i/cnt for i in sw_sum],
+                                                    'adc': crh_sum/cnt
+                                                    }
                                     self.data_ready.set()
                                     heading_sum = 0
                                     roll_sum = 0
@@ -159,9 +170,8 @@ class SLAMReader(object):
                                     heading_sum += packet['yaw']
                                     roll_sum += packet['roll']
                                     pitch_sum += packet['pitch']
-                                    bw_sum[0] += packet['bw'][0]
-                                    bw_sum[1] += packet['bw'][1]
-                                    bw_sum[2] += packet['bw'][2]
+                                    bw_sum = [x + y for x, y in zip(bw_sum, packet['bw'])]
+                                    sw_sum = [x + y for x, y in zip(sw_sum, packet['sw'])]
                                     crh_sum += packet['adc']
                                 if packet['frame'] == "None":
                                     pass
@@ -187,13 +197,25 @@ class SLAMReader(object):
                         self.vid.set(cv2.CAP_PROP_POS_FRAMES, 0)
                     if ret:
                         jpg = cv2.imencode('.jpg', img)[1].tobytes()
-                        self.package = {'yaw': 1.0, 'pitch': 2.0, 'roll': 3.0, 'adc': 100.0}
+                        self.package = {'yaw': 1.0,
+                                        'pitch': 2.0,
+                                        'roll': 3.0,
+                                        'bw': [0, 0, 0],
+                                        'sw': [0, 0, 0],
+                                        'adc': 100.0
+                                        }
                         self.frame = jpg
                         self.grabbed = True
             else:
                 time.sleep(0.1)
                 self.grabbed = True
-                self.package = {'yaw': 0.0, 'pitch': 0.0, 'roll': 0.0, 'adc': 0.0}
+                self.package = {'yaw': 0.0,
+                                'pitch': 0.0,
+                                'roll': 0.0,
+                                'bw': [0, 0, 0],
+                                'sw': [0, 0, 0],
+                                'adc': 0.0
+                                }
                 self.frame = self.wait_image
         if not DEBUG:
             pass
@@ -219,7 +241,7 @@ def start_logging():
     global slam_reader
     global actual_app_state
     global log_started
-    os.system('/home/step305/SLAM_NANO/slam_start.sh &')
+    os.system(SLAM_COMMAND)
     time.sleep(10)
     log_started.set()
     slam_reader.run()
@@ -360,6 +382,8 @@ def stream_data():
     yaw = anim_frames[anim_counter]
     pitch = anim_frames[anim_counter]
     roll = anim_frames[anim_counter]
+    bw = anim_frames[anim_counter]
+    sw = anim_frames[anim_counter]
     adc_value = anim_frames[anim_counter]
     if log_started.is_set():
         data = slam_reader.get_data()
@@ -367,8 +391,11 @@ def stream_data():
             yaw = '{:.2f}deg'.format(data['yaw'])
             pitch = '{:.2f}deg'.format(data['pitch'])
             roll = '{:.2f}deg'.format(data['roll'])
+            bw = '{:.1f}dph, {:.1f}dph, {:.1f}dph'.format(data['bw'][0], data['bw'][1], data['bw'][2])
+            sw = '{:.1e}, {:.1e}, {:.1e}'.format(data['sw'][0], data['sw'][1], data['sw'][2])
             adc_value = '{:.2f}deg/hr'.format((data['adc']))
-    return jsonify(yaw_value=yaw, pitch_value=pitch, roll_value=roll, adc_value=adc_value)
+    return jsonify(yaw_value=yaw, pitch_value=pitch, roll_value=roll,
+                   bias_value=bw, scale_value=sw, adc_value=adc_value)
 
 
 if __name__ == '__main__':
