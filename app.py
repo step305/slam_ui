@@ -12,9 +12,9 @@ import base64
 import numpy as np
 import threading
 
-# SLAM_COMMAND = '/home/step305/SLAM_NANO/slam_start.sh &'
+#SLAM_COMMAND = '/home/step305/SLAM_NANO/slam_start.sh &'
 SLAM_COMMAND = '/home/sergey/SLAM_NANO/slam_start.sh &'
-# FIFO_PATH = '/home/step305/SLAM_FIFO.tmp'
+#FIFO_PATH = '/home/step305/SLAM_FIFO.tmp'
 FIFO_PATH = '/home/sergey/SLAM_FIFO.tmp'
 
 # from OpenSSL import SSL
