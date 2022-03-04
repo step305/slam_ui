@@ -11,11 +11,26 @@ import socket
 import base64
 import numpy as np
 import threading
+from scipy.optimize import curve_fit
 
 #SLAM_COMMAND = '/home/step305/SLAM_NANO/slam_start.sh &'
 SLAM_COMMAND = '/home/sergey/SLAM_NANO/slam_start.sh &'
 #FIFO_PATH = '/home/step305/SLAM_FIFO.tmp'
 FIFO_PATH = '/home/sergey/SLAM_FIFO.tmp'
+
+azimuth = 0
+
+maytagging_first_run = True
+maytagging_proc = None
+maytagging_yaw_prev = 0
+maytagging_adc_prev = 0
+
+caruseling_run_cnt = 0
+caruseling_proc = None
+earth_meas_hist = []
+
+MAYTAGGING_WAIT_PERIOD = 20
+EartNorthComponent = 11.7
 
 # from OpenSSL import SSL
 
@@ -148,38 +163,42 @@ class SLAMReader(object):
 #                                    os.kill(pid, signal.SIGINT)
 #                                    time.sleep(1)
 #                                    break
-                                packet = json.loads(line)
-                                if cnt == max_cnt:
-                                    earth_meas = [heading_sum / cnt, crh_sum / cnt]
-                                    self.package = {'yaw': heading_sum/cnt,
-                                                    'pitch': pitch_sum/cnt,
-                                                    'roll': roll_sum/cnt,
-                                                    'bw': [i/cnt for i in bw_sum],
-                                                    'sw': [i/cnt for i in sw_sum],
-                                                    'adc': crh_sum/cnt
-                                                    }
-                                    self.data_ready.set()
-                                    heading_sum = 0
-                                    roll_sum = 0
-                                    pitch_sum = 0
-                                    bw_sum = [0, 0, 0]
-                                    crh_sum = 0
-                                    cnt = 0
-                                else:
-                                    cnt = cnt + 1
-                                    heading_sum += packet['yaw']
-                                    roll_sum += packet['roll']
-                                    pitch_sum += packet['pitch']
-                                    bw_sum = [x + y for x, y in zip(bw_sum, packet['bw'])]
-                                    sw_sum = [x + y for x, y in zip(sw_sum, packet['sw'])]
-                                    crh_sum += packet['adc']
-                                if packet['frame'] == "None":
-                                    pass
-                                else:
-                                    buf_decode = base64.b64decode(packet['frame'])
-                                    jpg = np.fromstring(buf_decode, np.uint8).tobytes()
-                                    self.frame = jpg
-                                    self.grabbed = True
+                                try:
+                                    packet = json.loads(line)
+                                    if cnt == max_cnt:
+                                        earth_meas = [heading_sum / cnt, crh_sum / cnt]
+                                        self.package = {'yaw': heading_sum/cnt,
+                                                        'pitch': pitch_sum/cnt,
+                                                        'roll': roll_sum/cnt,
+                                                        'bw': [i/cnt for i in bw_sum],
+                                                        'sw': [i/cnt for i in sw_sum],
+                                                        'adc': crh_sum/cnt
+                                                        }
+                                        self.data_ready.set()
+                                        heading_sum = 0
+                                        roll_sum = 0
+                                        pitch_sum = 0
+                                        bw_sum = [0, 0, 0]
+                                        crh_sum = 0
+                                        cnt = 0
+                                    else:
+                                        cnt = cnt + 1
+                                        heading_sum += packet['yaw']
+                                        roll_sum += packet['roll']
+                                        pitch_sum += packet['pitch']
+                                        bw_sum = [x + y for x, y in zip(bw_sum, packet['bw'])]
+                                        sw_sum = [x + y for x, y in zip(sw_sum, packet['sw'])]
+                                        crh_sum += packet['adc']
+                                    if packet['frame'] == "None":
+                                        pass
+                                    else:
+                                        buf_decode = base64.b64decode(packet['frame'])
+                                        jpg = np.fromstring(buf_decode, np.uint8).tobytes()
+                                        self.frame = jpg
+                                        self.grabbed = True
+                                except Exception as e:
+                                    print('Some error with STM32')
+                                    print(e)
                     except Exception as e:
                         print()
                         print(e)
@@ -237,7 +256,7 @@ def gen_frames():
                    b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')  # concat frame one by one and show result
 
 
-def start_logging():
+def start_logging(state):
     global slam_reader
     global actual_app_state
     global log_started
@@ -247,7 +266,7 @@ def start_logging():
     slam_reader.run()
 #    slam_reader.slam_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 #    slam_reader.slam_socket.connect((HOST, PORT))
-    actual_app_state = 'Logger::running...'
+    actual_app_state = state + '::running...'
 
 
 def stop_logging():
@@ -263,6 +282,105 @@ def stop_logging():
         slam_reader.stop()
 
 
+def compass_maytagging_point_worker():
+    global maytagging_yaw_prev
+    global maytagging_adc_prev
+    global azimuth
+    global maytagging_first_run
+    global actual_app_state
+    global MAYTAGGING_WAIT_PERIOD
+
+    tend = time.time() + MAYTAGGING_WAIT_PERIOD
+    yaw_acc = 0
+    adc_acc = 0
+    acc_cnt = 0
+    time.sleep(10)
+    while time.time() < tend:
+        if log_started.is_set():
+            data = slam_reader.get_data()
+            if data is not None:
+                yaw_acc += data['yaw']
+                adc_acc += data['adc']
+                acc_cnt += 1
+                time.sleep(0.01)
+    if acc_cnt > 0:
+        yaw_acc = yaw_acc / acc_cnt * np.pi / 180
+        adc_acc = adc_acc / acc_cnt
+        if maytagging_first_run:
+            maytagging_first_run = False
+            maytagging_yaw_prev = yaw_acc
+            maytagging_adc_prev = adc_acc
+        else:
+            try:
+                azimuth = -np.arccos(
+                    (maytagging_adc_prev - adc_acc) / EartNorthComponent / (np.cos(maytagging_yaw_prev) - np.cos(yaw_acc))
+                ) * 180 / np.pi
+                maytagging_yaw_prev = yaw_acc
+                maytagging_adc_prev = adc_acc
+            except Exception as e:
+                print('Invalid arccos', e)
+        actual_app_state = 'Maytagging::Point ready!'
+
+
+def fit_f(x, p1, p2, p3):
+    return p1 + p2*np.cos((p3+x)*np.pi/180)
+
+
+def compass_caruseling_point_worker():
+    global azimuth
+    global earth_meas_hist
+    global caruseling_run_cnt
+    global actual_app_state
+    global MAYTAGGING_WAIT_PERIOD
+    global earth_meas_hist
+
+    tend = time.time() + MAYTAGGING_WAIT_PERIOD
+    yaw_acc = 0
+    adc_acc = 0
+    acc_cnt = 0
+    time.sleep(10)
+    while time.time() < tend:
+        if log_started.is_set():
+            data = slam_reader.get_data()
+            if data is not None:
+                yaw_acc += data['yaw']
+                adc_acc += data['adc']
+                acc_cnt += 1
+                time.sleep(0.01)
+    if acc_cnt > 0:
+        yaw_acc = yaw_acc / acc_cnt
+        adc_acc = adc_acc /acc_cnt
+        earth_meas_hist.append([yaw_acc, adc_acc])
+        earth_meas_hist.sort(key=lambda x: x[0])
+        if caruseling_run_cnt < 5:
+            caruseling_run_cnt += 1
+        else:
+            try:
+                x = []
+                y = []
+                for meas in earth_meas_hist:
+                    x.append(meas[0])
+                    y.append(meas[1])
+                    print('heading = {:.2f}deg -> CRH = {:.2f}dph'.format(meas[0], meas[1]))
+                popt, pcov = curve_fit(fit_f, x, y, p0=(0.0, 10.2, 0))
+                azimuth = popt[2]
+            except Exception as e:
+                print('Invalid arccos', e)
+        actual_app_state = 'Caruseling::Point ready!'
+
+
+def calc_next_point_maytagging():
+    global maytagging_proc
+    maytagging_proc = threading.Thread(target=compass_maytagging_point_worker, args=())
+    maytagging_proc.start()
+
+
+def calc_next_point_caruseling():
+    global caruseling_proc
+    caruseling_proc = threading.Thread(target=compass_caruseling_point_worker, args=())
+    caruseling_proc.start()
+
+
 @app.route("/utils.js")
 def send_js():
     return send_from_directory('static', 'utils.js')
@@ -276,11 +394,18 @@ def send_css():
 @app.route("/command", methods=['POST'])
 def parse_command():
     global actual_app_state
+    global MAYTAGGING_WAIT_PERIOD
     global log_proc
+    global earth_meas_hist
+    global caruseling_run_cnt
+    global maytagging_first_run
+    global maytagging_adc_prev
+    global maytagging_yaw_prev
+
     source = str(request.referrer).split('/')[-1]
     if source == 'logger':
         if request.form.get('action') == 'start':
-            log_proc = threading.Thread(target=start_logging)
+            log_proc = threading.Thread(target=start_logging, args=('Logger',))
             log_proc.start()
             actual_app_state = "Logger::starting...Wait..."
         elif request.form.get('action') == 'stop':
@@ -288,14 +413,41 @@ def parse_command():
             actual_app_state = "Logger::Preview"
     elif source == 'caruseling':
         if request.form.get('action') == 'start':
+            log_proc = threading.Thread(target=start_logging, args=('Caruseling',))
+            caruseling_run_cnt = 0
+            earth_meas_hist = []
+            log_proc.start()
             actual_app_state = "Caruseling:: starting...Wait..."
         elif request.form.get('action') == 'stop':
+            stop_logging()
             actual_app_state = "Caruseling::Preview"
+        elif request.form.get('action') == 'next':
+            calc_next_point_caruseling()
+            actual_app_state = 'Caruseling::In progress'
+        elif request.form.get('action') == 'set_log_duration':
+            try:
+                MAYTAGGING_WAIT_PERIOD = int(request.form.get('log_duration'))
+            except Exception as e:
+                print('Cannot set maytagging_duration!!!!')
     elif source == 'maytagging':
         if request.form.get('action') == 'start':
+            log_proc = threading.Thread(target=start_logging, args=('Maytagging',))
+            maytagging_adc_prev = 0
+            maytagging_first_run = True
+            maytagging_yaw_prev = 0
+            log_proc.start()
             actual_app_state = "Maytagging:: starting...Wait..."
         elif request.form.get('action') == 'stop':
+            stop_logging()
             actual_app_state = "Maytagging::Preview"
+        elif request.form.get('action') == 'next':
+            calc_next_point_maytagging()
+            actual_app_state = 'Maytagging::In progress'
+        elif request.form.get('action') == 'set_log_duration':
+            try:
+                MAYTAGGING_WAIT_PERIOD = int(request.form.get('log_duration'))
+            except Exception as e:
+                print('Cannot set maytagging_duration!!!!')
     elif source == 'compassing':
         if request.form.get('action') == 'start':
             actual_app_state = "Compassing:: starting...Wait..."
@@ -385,17 +537,27 @@ def stream_data():
     bw = anim_frames[anim_counter]
     sw = anim_frames[anim_counter]
     adc_value = anim_frames[anim_counter]
+    azimuth_value = anim_frames[anim_counter]
     if log_started.is_set():
         data = slam_reader.get_data()
         if data is not None:
-            yaw = '{:.2f}deg'.format(data['yaw'])
-            pitch = '{:.2f}deg'.format(data['pitch'])
-            roll = '{:.2f}deg'.format(data['roll'])
-            bw = '{:.1f}dph, {:.1f}dph, {:.1f}dph'.format(data['bw'][0], data['bw'][1], data['bw'][2])
-            sw = '{:.1e}, {:.1e}, {:.1e}'.format(data['sw'][0], data['sw'][1], data['sw'][2])
-            adc_value = '{:.2f}deg/hr'.format((data['adc']))
+            yaw = '{:10.2f}deg'.format(data['yaw'])
+            yaw = yaw.replace(' ', '\xa0')
+            pitch = '{:10.2f}deg'.format(data['pitch'])
+            pitch = pitch.replace(' ', '\xa0')
+            roll = '{:10.2f}deg'.format(data['roll'])
+            roll = roll.replace(' ', '\xa0')
+            bw = '{:10.1f}dph\r\n{:10.1f}dph\r\n{:10.1f}dph'.format(data['bw'][0], data['bw'][1], data['bw'][2])
+            bw = bw.replace(' ', '\xa0')
+            sw = '{:10.1e}\r\n{:10.1e}\r\n{:10.1e}'.format(data['sw'][0], data['sw'][1], data['sw'][2])
+            sw = sw.replace(' ', '\xa0')
+            adc_value = '{:12.2f}deg/hr'.format((data['adc']))
+            adc_value = adc_value.replace(' ', '\xa0')
+            azimuth_value = '{:10.2f}deg'.format(azimuth + data['yaw'])
+            azimuth_value = azimuth_value.replace(' ', '\xa0')
     return jsonify(yaw_value=yaw, pitch_value=pitch, roll_value=roll,
-                   bias_value=bw, scale_value=sw, adc_value=adc_value)
+                   bias_value=bw, scale_value=sw, adc_value=adc_value,
+                   azimuth_value=azimuth_value)
 
 
 if __name__ == '__main__':

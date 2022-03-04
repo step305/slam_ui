@@ -19,12 +19,8 @@
                 <td><span id="roll_value"></span></td>
             </tr>
             <tr>
-                <td>Bias</td>
-                <td><span id="bias_value"></span></td>
-            </tr>
-            <tr>
-                <td>ADC value</td>
-                <td><span id="adc_value"></span></td>
+                <td>Azimuth value</td>
+                <td><span id="azimuth_value"></span></td>
             </tr>
         </table>
     </div>
@@ -33,4 +29,10 @@
 <form method="post" action="/command">
     <input type="submit" value="start" name="action"/>
     <input type="submit" value="stop" name="action"/>
+    <input type="submit" value="next" name="action"/>
+</form>
+
+<form method="post" action="/command">
+    <input type="text" value=100 name="log_duration"/>
+    <input type="submit" value="set_log_duration" name="action">
 </form>
